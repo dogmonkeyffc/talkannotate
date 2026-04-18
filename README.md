@@ -13,6 +13,7 @@
 ```bash
 git clone <本项目地址>
 cd talkannotate
+cp ./skills/markdown-preview-approved $path/to/your/skills-dir/
 docker compose up -d --build
 ```
 
@@ -26,3 +27,4 @@ TALKANNOTATE_HOST_PORT=8080 docker compose up -d --build
 ## API
 
 查阅 api 在线文档：http://localhost:3180/documentation/json
+
