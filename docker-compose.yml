@@ -12,8 +12,8 @@ services:
       TALKANNOTATE_DATA_DIR: /app/data
       NODE_ENV: production
     volumes:
-      - app-data:/app/data
+      - talkannotate-app-data:/app/data
     restart: unless-stopped
 
 volumes:
-  app-data:
+  talkannotate-app-data:
