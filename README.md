@@ -1,134 +1,25 @@
 # TalkAnnotate
 
-TalkAnnotate is a single-container Markdown discussion workspace for AI-assisted architecture review. Markdown files stay on disk, metadata stays in SQLite, and the UI focuses on reading, version browsing, Mermaid preview, and anchored annotations.
+自托管的 Markdown 文档批注系统。
 
-## Stack
+## 技术栈
 
-- **Backend:** Node.js, Fastify, TypeScript, better-sqlite3, ts-pattern
-- **Frontend:** React, Vite, Mantine, react-markdown, Mermaid
-- **Tooling:** pnpm workspace, ESLint, Prettier, Changesets
-- **Storage:** SQLite plus file-backed Markdown snapshots
-- **Deployment:** Docker Compose, single runtime container
+- 前端：React + Mantine
+- 后端：Fastify + TypeScript
+- 数据库：SQLite
 
-## Start
+## 部署
 
 ```bash
-docker compose up -d
+git clone <本项目地址>
+cd talkannotate
+docker compose up -d --build
 ```
 
-The app serves on `http://localhost:3180` by default.
+启动后访问 `http://localhost:3180`。
 
-If that host port is occupied, override it:
+如需修改端口：
 
 ```bash
-TALKANNOTATE_HOST_PORT=3000 docker compose up -d
+TALKANNOTATE_HOST_PORT=8080 docker compose up -d --build
 ```
-
-## Local commands
-
-```bash
-pnpm install
-pnpm lint
-pnpm typecheck
-pnpm build
-```
-
-## Data layout
-
-```text
-data/
-  app.db
-  markdown/
-    <slug>.md
-  versions/
-    <slug>/
-      v0001.md
-      v0002.md
-```
-
-The `data/` directory is mounted into the container as a volume.
-
-## REST API
-
-### Health
-
-```http
-GET /api/health
-```
-
-### Push or update a Markdown document
-
-```http
-POST /api/documents
-Content-Type: application/json
-
-{
-  "title": "Architecture Overview",
-  "slug": "architecture-overview",
-  "content": "# Architecture Overview\n\n## Goals\n..."
-}
-```
-
-Each push creates a new version snapshot if the content changed.
-
-### List documents
-
-```http
-GET /api/documents
-```
-
-### Read one document version
-
-```http
-GET /api/documents/:slug/content?version=2
-```
-
-### List versions
-
-```http
-GET /api/documents/:slug/versions
-```
-
-### List annotations
-
-```http
-GET /api/documents/:slug/annotations?version=2
-```
-
-### Create an anchored annotation
-
-```http
-POST /api/documents/:slug/annotations
-Content-Type: application/json
-
-{
-  "version": 2,
-  "note": "This section needs a boundary between ingest and query services.",
-  "color": "violet",
-  "anchor": {
-    "blockId": "p-421",
-    "selectedText": "query services",
-    "quote": "query services",
-    "startOffset": 15,
-    "endOffset": 29,
-    "contextBefore": "between ingest and ",
-    "contextAfter": "."
-  }
-}
-```
-
-## Export and import
-
-Export a runnable tar bundle:
-
-```bash
-pnpm export:tar
-```
-
-Import a bundle and restart the app:
-
-```bash
-pnpm import:tar -- ./exports/talkannotate-bundle-YYYYMMDDHHMMSS.tar
-```
-
-The exported tar contains the built Docker image, `docker-compose.yml`, and the mounted `data/` directory.
