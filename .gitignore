@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+exports
+
+data/
+
+apps/server/public/*
+!apps/server/public/.gitkeep

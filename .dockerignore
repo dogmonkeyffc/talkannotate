@@ -1,0 +1,10 @@
+.git
+.copilot
+node_modules
+**/node_modules
+dist
+**/dist
+coverage
+exports
+data
+.DS_Store

@@ -1,0 +1,42 @@
+{
+  "name": "talkannotate",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Markdown architecture discussion workspace with anchored annotations.",
+  "type": "module",
+  "packageManager": "pnpm@10.18.3",
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "pnpm --filter @talkannotate/web build && node ./scripts/sync-web-dist.mjs && pnpm --filter @talkannotate/server build",
+    "dev": "docker compose up -d",
+    "up": "docker compose up -d",
+    "down": "docker compose down",
+    "logs": "docker compose logs -f app",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "format": "prettier --check .",
+    "format:write": "prettier --write .",
+    "release:version": "changeset version",
+    "release:publish": "changeset publish"
+  },
+  "keywords": [
+    "markdown",
+    "annotations",
+    "react",
+    "fastify",
+    "sqlite"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "@changesets/cli": "^2.29.7",
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-react-hooks": "^7.0.1",
+    "eslint-plugin-react-refresh": "^0.4.24",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript-eslint": "^8.46.2"
+  }
+}

@@ -1,0 +1,47 @@
+:root {
+  color-scheme: dark;
+  --app-body-background:
+    radial-gradient(circle at top, rgba(99, 102, 241, 0.18), transparent 30%),
+    linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+  --app-body-color: #e2e8f0;
+}
+
+:root[data-mantine-color-scheme='light'] {
+  color-scheme: light;
+  --app-body-background:
+    radial-gradient(circle at top, rgba(79, 70, 229, 0.12), transparent 30%),
+    linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
+  --app-body-color: #0f172a;
+}
+
+body {
+  margin: 0;
+  background: var(--app-body-background);
+  color: var(--app-body-color);
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+#root {
+  min-height: 100vh;
+}

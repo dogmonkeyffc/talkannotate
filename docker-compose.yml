@@ -1,0 +1,19 @@
+services:
+  app:
+    image: talkannotate-app:latest
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - '${TALKANNOTATE_HOST_PORT:-3180}:3000'
+    environment:
+      PORT: 3000
+      TALKANNOTATE_DATA_DIR: /app/data
+      NODE_ENV: production
+    volumes:
+      - app-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
