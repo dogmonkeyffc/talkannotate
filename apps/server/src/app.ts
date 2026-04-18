@@ -1,5 +1,6 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createRequire } from 'node:module'
 import { spawn } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { randomUUID } from 'node:crypto'
@@ -7,7 +8,6 @@ import { writeFile, unlink } from 'node:fs/promises'
 import cors from '@fastify/cors'
 import fastifyStatic from '@fastify/static'
 import fastifySwagger from '@fastify/swagger'
-import fastifySwaggerUi from '@fastify/swagger-ui'
 import Fastify, { type FastifyInstance } from 'fastify'
 import { ZodError } from 'zod'
 
@@ -15,10 +15,14 @@ import { DocumentStore } from './store.js'
 import { createAnnotationSchema, pushDocumentSchema } from './types.js'
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url))
+const require = createRequire(import.meta.url)
 const defaultDataDir = path.resolve(sourceDir, '../../../data')
 const publicDir = path.resolve(sourceDir, '../public')
+const assetsDir = path.join(publicDir, 'assets')
+const swaggerUiDir = path.dirname(require.resolve('@fastify/swagger-ui'))
+const swaggerUiStaticDir = path.join(swaggerUiDir, 'static')
 
-export function createApp() {
+export async function createApp() {
   const app = Fastify({
     logger: true,
   })
@@ -31,11 +35,17 @@ export function createApp() {
     store.close()
   })
 
-  app.register(cors, {
+  await app.register(cors, {
     origin: true,
   })
 
-  app.register(fastifySwagger, {
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.raw.url === '/documentation') {
+      await reply.redirect('/documentation/')
+    }
+  })
+
+  await app.register(fastifySwagger, {
     swagger: {
       info: {
         title: 'TalkAnnotate API',
@@ -50,14 +60,51 @@ export function createApp() {
     },
   })
 
-  app.register(fastifySwaggerUi, {
-    routePrefix: '/documentation',
+  await app.register(fastifyStatic, {
+    prefix: '/assets/',
+    root: assetsDir,
   })
 
-  app.register(fastifyStatic, {
-    prefix: '/',
-    root: publicDir,
+  await app.register(fastifyStatic, {
+    decorateReply: false,
+    prefix: '/documentation/static/',
+    root: swaggerUiStaticDir,
   })
+
+  app.get('/documentation/json', async () => app.swagger())
+  app.get('/documentation/yaml', async (_request, reply) => {
+    reply.type('text/yaml; charset=utf-8').send(app.swagger({ yaml: true }))
+  })
+  app.get('/documentation/', async (_request, reply) => {
+    reply.type('text/html; charset=utf-8').send(`<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TalkAnnotate API Docs</title>
+    <link rel="icon" type="image/png" href="/documentation/static/favicon-32x32.png" sizes="32x32" />
+    <link rel="icon" type="image/png" href="/documentation/static/favicon-16x16.png" sizes="16x16" />
+    <link rel="stylesheet" href="/documentation/static/swagger-ui.css" />
+    <link rel="stylesheet" href="/documentation/static/index.css" />
+  </head>
+  <body>
+    <div id="swagger-ui"></div>
+    <script src="/documentation/static/swagger-ui-bundle.js"></script>
+    <script src="/documentation/static/swagger-ui-standalone-preset.js"></script>
+    <script>
+      window.ui = SwaggerUIBundle({
+        dom_id: '#swagger-ui',
+        layout: 'StandaloneLayout',
+        presets: [SwaggerUIBundle.presets.apis, SwaggerUIStandalonePreset],
+        url: '/documentation/json',
+      })
+    </script>
+  </body>
+</html>`)
+  })
+
+  app.get('/favicon.svg', async (_request, reply) => reply.sendFile('favicon.svg', publicDir))
+  app.get('/icons.svg', async (_request, reply) => reply.sendFile('icons.svg', publicDir))
 
   app.addContentTypeParser(
     'application/octet-stream',
@@ -97,7 +144,7 @@ export function createApp() {
   })
 
   app.setNotFoundHandler(async (request, reply) => {
-    if (request.url.startsWith('/api/')) {
+    if (request.url.startsWith('/api/') || request.url.startsWith('/documentation/')) {
       reply.status(404).send({
         error: 'Not Found',
         message: `Route ${request.url} was not found.`,
@@ -105,7 +152,7 @@ export function createApp() {
       return
     }
 
-    return reply.sendFile('index.html')
+    return reply.sendFile('index.html', publicDir)
   })
 
   return app
@@ -156,14 +203,14 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
     {
       schema: {
         tags: ['documents'],
-        description: '创建或更新文档（如果 slug 已存在则追加版本）',
+        description: '创建文档或基于已有文档 ID 追加新版本',
         body: {
           type: 'object',
           required: ['title', 'content'],
           properties: {
             title: { type: 'string', description: '文档标题' },
             content: { type: 'string', description: 'Markdown 内容' },
-            slug: { type: 'string', description: '文档 slug（可选，自动生成）' },
+            id: { type: 'string', format: 'uuid', description: '文档 ID（可选，用于追加版本）' },
           },
         },
         response: {
@@ -190,16 +237,16 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
   )
 
   app.get(
-    '/api/documents/:slug/content',
+    '/api/documents/:id/content',
     {
       schema: {
         tags: ['documents'],
         description: '获取文档内容（支持按版本查询）',
         params: {
           type: 'object',
-          required: ['slug'],
+          required: ['id'],
           properties: {
-            slug: { type: 'string' },
+            id: { type: 'string', format: 'uuid' },
           },
         },
         querystring: {
@@ -211,46 +258,46 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
       },
     },
     async (request) => {
-      const { slug } = request.params as { slug: string }
+      const { id } = request.params as { id: string }
       const { version } = request.query as { version?: string }
-      return store.getDocumentDetail(slug, version ? Number(version) : undefined)
+      return store.getDocumentDetail(id, version ? Number(version) : undefined)
     },
   )
 
   app.get(
-    '/api/documents/:slug/versions',
+    '/api/documents/:id/versions',
     {
       schema: {
         tags: ['documents'],
         description: '列出文档的所有版本',
         params: {
           type: 'object',
-          required: ['slug'],
+          required: ['id'],
           properties: {
-            slug: { type: 'string' },
+            id: { type: 'string', format: 'uuid' },
           },
         },
       },
     },
     async (request) => {
-      const { slug } = request.params as { slug: string }
+      const { id } = request.params as { id: string }
       return {
-        items: store.listVersions(slug),
+        items: store.listVersions(id),
       }
     },
   )
 
   app.get(
-    '/api/documents/:slug/annotations',
+    '/api/documents/:id/annotations',
     {
       schema: {
         tags: ['annotations'],
         description: '获取文档的所有批注',
         params: {
           type: 'object',
-          required: ['slug'],
+          required: ['id'],
           properties: {
-            slug: { type: 'string' },
+            id: { type: 'string', format: 'uuid' },
           },
         },
         querystring: {
@@ -262,25 +309,25 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
       },
     },
     async (request) => {
-      const { slug } = request.params as { slug: string }
+      const { id } = request.params as { id: string }
       const { version } = request.query as { version?: string }
       return {
-        items: store.listAnnotations(slug, version ? Number(version) : undefined),
+        items: store.listAnnotations(id, version ? Number(version) : undefined),
       }
     },
   )
 
   app.post(
-    '/api/documents/:slug/annotations',
+    '/api/documents/:id/annotations',
     {
       schema: {
         tags: ['annotations'],
         description: '在文档上创建批注',
         params: {
           type: 'object',
-          required: ['slug'],
+          required: ['id'],
           properties: {
-            slug: { type: 'string' },
+            id: { type: 'string', format: 'uuid' },
           },
         },
         body: {
@@ -312,9 +359,9 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
       },
     },
     async (request, reply) => {
-      const { slug } = request.params as { slug: string }
+      const { id } = request.params as { id: string }
       const payload = createAnnotationSchema.parse(request.body)
-      const annotation = store.createAnnotation(slug, payload)
+      const annotation = store.createAnnotation(id, payload)
       reply.status(201).send(annotation)
     },
   )

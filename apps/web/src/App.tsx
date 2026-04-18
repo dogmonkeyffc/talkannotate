@@ -62,7 +62,7 @@ function App() {
   const [detailState, setDetailState] = useState<RemoteState<DocumentDetail>>({
     status: 'idle',
   })
-  const [selectedSlug, setSelectedSlug] = useState<string | null>(null)
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
   const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -76,19 +76,19 @@ function App() {
     }
     return 'light'
   })
-  const selectedSlugRef = useRef<string | null>(null)
+  const selectedDocumentIdRef = useRef<string | null>(null)
 
   useEffect(() => {
-    selectedSlugRef.current = selectedSlug
-  }, [selectedSlug])
+    selectedDocumentIdRef.current = selectedDocumentId
+  }, [selectedDocumentId])
 
   const fetchDocuments = useCallback(async () => {
     try {
       const items = await api.listDocuments()
-      const nextSlug = chooseSlug(items, selectedSlugRef.current)
+      const nextDocumentId = chooseDocumentId(items, selectedDocumentIdRef.current)
       setDocumentsState({ data: items, status: 'ready' })
-      setDetailState(nextSlug ? { status: 'loading' } : { status: 'idle' })
-      setSelectedSlug(nextSlug)
+      setDetailState(nextDocumentId ? { status: 'loading' } : { status: 'idle' })
+      setSelectedDocumentId(nextDocumentId)
     } catch (error) {
       setDocumentsState({
         message: toMessage(error),
@@ -110,14 +110,14 @@ function App() {
   }, [fetchDocuments])
 
   useEffect(() => {
-    if (!selectedSlug) {
+    if (!selectedDocumentId) {
       return
     }
 
     let cancelled = false
 
     void api
-      .getDocumentDetail(selectedSlug, selectedVersion ?? undefined)
+      .getDocumentDetail(selectedDocumentId, selectedVersion ?? undefined)
       .then((data) => {
         if (!cancelled) {
           setDetailState({ data, status: 'ready' })
@@ -135,7 +135,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [refreshToken, selectedSlug, selectedVersion])
+  }, [refreshToken, selectedDocumentId, selectedVersion])
 
   const versionOptions = useMemo(
     () =>
@@ -155,22 +155,22 @@ function App() {
 
   const handleCreateAnnotation = useCallback(
     async (payload: CreateAnnotationPayload) => {
-      if (!selectedSlug) {
+      if (!selectedDocumentId) {
         return
       }
 
       setSavingAnnotation(true)
       try {
-        await api.createAnnotation(selectedSlug, payload)
+        await api.createAnnotation(selectedDocumentId, payload)
         // Silent refresh: keep detailState as 'ready' so MarkdownPreview stays mounted
         // and scroll position is preserved.
-        const data = await api.getDocumentDetail(selectedSlug, selectedVersion ?? undefined)
+        const data = await api.getDocumentDetail(selectedDocumentId, selectedVersion ?? undefined)
         setDetailState({ data, status: 'ready' })
       } finally {
         setSavingAnnotation(false)
       }
     },
-    [selectedSlug, selectedVersion],
+    [selectedDocumentId, selectedVersion],
   )
 
   const clipboard = useClipboard({ timeout: 2000 })
@@ -337,14 +337,14 @@ function App() {
                         <Box
                           className={[
                             'document-card',
-                            document.slug === selectedSlug ? 'document-card--active' : '',
+                            document.id === selectedDocumentId ? 'document-card--active' : '',
                           ]
                             .filter(Boolean)
                             .join(' ')}
                           key={document.id}
                           onClick={() => {
                             setDetailState({ status: 'loading' })
-                            setSelectedSlug(document.slug)
+                            setSelectedDocumentId(document.id)
                             setSelectedVersion(null)
                             setFocusedBlockId(null)
                           }}
@@ -497,12 +497,12 @@ function formatTimestamp(value: string) {
   return value.replace('T', ' ').slice(0, 16)
 }
 
-function chooseSlug(items: DocumentListItem[], currentSlug: string | null) {
-  if (currentSlug && items.some((item) => item.slug === currentSlug)) {
-    return currentSlug
+function chooseDocumentId(items: DocumentListItem[], currentDocumentId: string | null) {
+  if (currentDocumentId && items.some((item) => item.id === currentDocumentId)) {
+    return currentDocumentId
   }
 
-  return items[0]?.slug ?? null
+  return items[0]?.id ?? null
 }
 
 function toMessage(error: unknown) {

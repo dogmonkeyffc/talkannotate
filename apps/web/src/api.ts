@@ -22,8 +22,8 @@ async function request<T>(input: string, init?: RequestInit) {
 }
 
 export const api = {
-  async createAnnotation(slug: string, payload: CreateAnnotationPayload) {
-    return request(`/api/documents/${slug}/annotations`, {
+  async createAnnotation(documentId: string, payload: CreateAnnotationPayload) {
+    return request(`/api/documents/${documentId}/annotations`, {
       body: JSON.stringify(payload),
       method: 'POST',
     })
@@ -31,8 +31,8 @@ export const api = {
   async deleteAnnotation(annotationId: string) {
     await fetch(`/api/annotations/${annotationId}`, { method: 'DELETE' })
   },
-  async getDocumentDetail(slug: string, version?: number) {
-    const url = new URL(`/api/documents/${slug}/content`, window.location.origin)
+  async getDocumentDetail(documentId: string, version?: number) {
+    const url = new URL(`/api/documents/${documentId}/content`, window.location.origin)
     if (version !== undefined) {
       url.searchParams.set('version', String(version))
     }

@@ -113,7 +113,6 @@ export class DocumentStore {
     if (row?.count === 0) {
       this.upsertDocument({
         content: sampleDocument,
-        slug: 'welcome',
         title: 'Welcome',
       })
     }
@@ -156,14 +155,14 @@ export class DocumentStore {
     return rows
   }
 
-  getDocumentDetail(slug: string, requestedVersion?: number): DocumentDetail {
-    const document = this.getDocumentRow(slug)
+  getDocumentDetail(documentId: string, requestedVersion?: number): DocumentDetail {
+    const document = this.getDocumentRow(documentId)
     const selectedVersion = requestedVersion ?? document.current_version
     const versionRow = this.getVersionRow(document.id, selectedVersion)
     const content = readFileSync(path.join(this.dataDir, versionRow.file_path), 'utf8')
 
     return {
-      annotations: this.listAnnotations(slug, selectedVersion),
+      annotations: this.listAnnotations(documentId, selectedVersion),
       content,
       currentVersion: document.current_version,
       id: document.id,
@@ -173,12 +172,12 @@ export class DocumentStore {
       summary: versionRow.summary,
       title: document.title,
       updatedAt: document.updated_at,
-      versions: this.listVersions(slug),
+      versions: this.listVersions(documentId),
     }
   }
 
-  listVersions(slug: string): DocumentVersionSummary[] {
-    const document = this.getDocumentRow(slug)
+  listVersions(documentId: string): DocumentVersionSummary[] {
+    const document = this.getDocumentRow(documentId)
     return this.db
       .prepare<
         string,
@@ -201,8 +200,8 @@ export class DocumentStore {
       .all(document.id)
   }
 
-  listAnnotations(slug: string, version?: number): AnnotationRecord[] {
-    const document = this.getDocumentRow(slug)
+  listAnnotations(documentId: string, version?: number): AnnotationRecord[] {
+    const document = this.getDocumentRow(documentId)
     const selectedVersion = version ?? document.current_version
 
     const rows = this.db
@@ -236,11 +235,12 @@ export class DocumentStore {
 
   upsertDocument(input: PushDocumentInput): DocumentDetail {
     const title = input.title.trim()
-    const slug = normalizeSlug(input.slug ?? title)
     const content = input.content.replace(/\r\n/g, '\n')
     const contentHash = hashContent(content)
     const summary = extractSummary(content)
-    const existingDocument = this.findDocumentRow(slug)
+    const existingDocument = input.id ? this.findDocumentRow(input.id) : undefined
+    const documentId = existingDocument?.id ?? randomUUID()
+    const slug = existingDocument?.slug ?? `${normalizeSlug(title)}-${documentId.slice(0, 8)}`
 
     if (existingDocument) {
       const currentVersion = this.getVersionMetadata(
@@ -253,13 +253,12 @@ export class DocumentStore {
         currentVersion.hash === contentHash &&
         existingDocument.title === title
       ) {
-        return this.getDocumentDetail(slug)
+        return this.getDocumentDetail(existingDocument.id)
       }
     }
 
     const nextVersion = existingDocument ? existingDocument.current_version + 1 : 1
-    const documentId = existingDocument?.id ?? randomUUID()
-    const filePaths = this.writeMarkdownFiles(slug, nextVersion, content)
+    const filePaths = this.writeMarkdownFiles(documentId, nextVersion, content)
 
     this.db.transaction(() => {
       if (existingDocument) {
@@ -310,11 +309,11 @@ export class DocumentStore {
         )
     })()
 
-    return this.getDocumentDetail(slug, nextVersion)
+    return this.getDocumentDetail(documentId, nextVersion)
   }
 
-  createAnnotation(slug: string, input: CreateAnnotationInput): AnnotationRecord {
-    const document = this.getDocumentRow(slug)
+  createAnnotation(documentId: string, input: CreateAnnotationInput): AnnotationRecord {
+    const document = this.getDocumentRow(documentId)
     const version = input.version ?? document.current_version
 
     this.getVersionRow(document.id, version)
@@ -470,16 +469,16 @@ export class DocumentStore {
     addColumn('ALTER TABLE annotations ADD COLUMN end_col INTEGER')
   }
 
-  private getDocumentRow(slug: string): DocumentRow {
-    const row = this.findDocumentRow(slug)
+  private getDocumentRow(documentId: string): DocumentRow {
+    const row = this.findDocumentRow(documentId)
     if (!row) {
-      throw new Error(`Document "${slug}" was not found.`)
+      throw new Error(`Document "${documentId}" was not found.`)
     }
 
     return row
   }
 
-  private findDocumentRow(slug: string): DocumentRow | undefined {
+  private findDocumentRow(documentId: string): DocumentRow | undefined {
     return this.db
       .prepare<string, DocumentRow>(
         `SELECT
@@ -489,9 +488,9 @@ export class DocumentStore {
           current_version,
           updated_at
         FROM documents
-        WHERE slug = ?`,
+        WHERE id = ?`,
       )
-      .get(slug)
+      .get(documentId)
   }
 
   private getVersionRow(documentId: string, version: number): VersionRow {
@@ -528,11 +527,11 @@ export class DocumentStore {
       .get(documentId, version)
   }
 
-  private writeMarkdownFiles(slug: string, version: number, content: string) {
-    const currentFilePath = path.join('markdown', `${slug}.md`)
-    const versionDir = path.join(this.versionsDir, slug)
+  private writeMarkdownFiles(documentId: string, version: number, content: string) {
+    const currentFilePath = path.join('markdown', `${documentId}.md`)
+    const versionDir = path.join(this.versionsDir, documentId)
     const versionFileName = `v${String(version).padStart(VERSION_PAD, '0')}.md`
-    const versionFilePath = path.join('versions', slug, versionFileName)
+    const versionFilePath = path.join('versions', documentId, versionFileName)
 
     mkdirSync(versionDir, { recursive: true })
     writeFileSync(path.join(this.dataDir, currentFilePath), content, 'utf8')

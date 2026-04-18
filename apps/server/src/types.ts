@@ -59,7 +59,7 @@ export type DocumentDetail = {
 
 export const pushDocumentSchema = z.object({
   content: z.string().min(1),
-  slug: z.string().trim().min(1).optional(),
+  id: z.string().uuid().optional(),
   title: z.string().trim().min(1),
 })
 
