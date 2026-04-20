@@ -71,6 +71,7 @@ function App() {
   const [refreshToken, setRefreshToken] = useState(0)
   const [savingAnnotation, setSavingAnnotation] = useState(false)
   const [documentPendingDeletion, setDocumentPendingDeletion] = useState<DocumentListItem | null>(null)
+  const [documentDeletionError, setDocumentDeletionError] = useState<string | null>(null)
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null)
   const [colorScheme, setColorScheme] = useState<'dark' | 'light'>(() => {
     try {
@@ -253,15 +254,21 @@ function App() {
       return
     }
 
+    setDocumentDeletionError(null)
     setDeletingDocumentId(documentPendingDeletion.id)
     try {
       await api.deleteDocument(documentPendingDeletion.id)
+      setDocumentDeletionError(null)
       setDocumentPendingDeletion(null)
       refreshDocuments()
+    } catch (error) {
+      setDocumentDeletionError(toMessage(error))
     } finally {
       setDeletingDocumentId(null)
     }
   }, [documentPendingDeletion, refreshDocuments])
+
+  const isDeletingDocument = deletingDocumentId !== null
 
   return (
     <MantineProvider defaultColorScheme="light" forceColorScheme={colorScheme} theme={theme}>
@@ -383,6 +390,7 @@ function App() {
                                 loading={deletingDocumentId === document.id}
                                 onClick={(event) => {
                                   event.stopPropagation()
+                                  setDocumentDeletionError(null)
                                   setDocumentPendingDeletion(document)
                                 }}
                                 size="sm"
@@ -524,7 +532,8 @@ function App() {
         <Modal
           centered
           onClose={() => {
-            if (!deletingDocumentId) {
+            if (!isDeletingDocument) {
+              setDocumentDeletionError(null)
               setDocumentPendingDeletion(null)
             }
           }}
@@ -537,17 +546,25 @@ function App() {
               删除后将物理移除文档、全部版本和关联批注，且无法恢复。
             </Text>
             <PaperLikeTitle title={documentPendingDeletion?.title ?? ''} />
+            {documentDeletionError ? (
+              <Text c="red" size="sm">
+                {documentDeletionError}
+              </Text>
+            ) : null}
             <Group justify="flex-end">
               <Button
-                onClick={() => setDocumentPendingDeletion(null)}
+                onClick={() => {
+                  setDocumentDeletionError(null)
+                  setDocumentPendingDeletion(null)
+                }}
                 variant="subtle"
-                disabled={deletingDocumentId !== null}
+                disabled={isDeletingDocument}
               >
                 取消
               </Button>
               <Button
                 color="red"
-                loading={deletingDocumentId !== null}
+                loading={isDeletingDocument}
                 onClick={() => void handleConfirmDeleteDocument()}
               >
                 确认删除
