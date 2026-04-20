@@ -1,10 +1,12 @@
 import {
   ActionIcon,
   Badge,
+  Button,
   Box,
   Group,
   Loader,
   MantineProvider,
+  Modal,
   ScrollArea,
   Select,
   Stack,
@@ -19,6 +21,7 @@ import {
   IconRefresh,
   IconSparkles,
   IconSun,
+  IconTrash,
   IconUpload,
 } from '@tabler/icons-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -67,6 +70,8 @@ function App() {
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const [savingAnnotation, setSavingAnnotation] = useState(false)
+  const [documentPendingDeletion, setDocumentPendingDeletion] = useState<DocumentListItem | null>(null)
+  const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null)
   const [colorScheme, setColorScheme] = useState<'dark' | 'light'>(() => {
     try {
       const stored = localStorage.getItem('talkannotate-color-scheme')
@@ -228,7 +233,7 @@ function App() {
       const next = value === 'dark' ? 'light' : 'dark'
       try {
         localStorage.setItem('talkannotate-color-scheme', next)
-      } catch (_e) {
+      } catch {
         // ignore storage errors
       }
       return next
@@ -242,6 +247,21 @@ function App() {
     },
     [refreshCurrentDocument],
   )
+
+  const handleConfirmDeleteDocument = useCallback(async () => {
+    if (!documentPendingDeletion) {
+      return
+    }
+
+    setDeletingDocumentId(documentPendingDeletion.id)
+    try {
+      await api.deleteDocument(documentPendingDeletion.id)
+      setDocumentPendingDeletion(null)
+      refreshDocuments()
+    } finally {
+      setDeletingDocumentId(null)
+    }
+  }, [documentPendingDeletion, refreshDocuments])
 
   return (
     <MantineProvider defaultColorScheme="light" forceColorScheme={colorScheme} theme={theme}>
@@ -353,9 +373,24 @@ function App() {
                             <Text fw={700} lineClamp={1}>
                               {document.title}
                             </Text>
-                            <Badge color="green" variant="light">
-                              v{document.currentVersion}
-                            </Badge>
+                            <Group gap={8} wrap="nowrap">
+                              <Badge color="green" variant="light">
+                                v{document.currentVersion}
+                              </Badge>
+                              <ActionIcon
+                                aria-label={`删除文档 ${document.title}`}
+                                color="red"
+                                loading={deletingDocumentId === document.id}
+                                onClick={(event) => {
+                                  event.stopPropagation()
+                                  setDocumentPendingDeletion(document)
+                                }}
+                                size="sm"
+                                variant="subtle"
+                              >
+                                <IconTrash size={14} />
+                              </ActionIcon>
+                            </Group>
                           </div>
                           <Text c="dimmed" lineClamp={3} size="sm">
                             {document.summary}
@@ -486,6 +521,40 @@ function App() {
               ))}
           </main>
         </div>
+        <Modal
+          centered
+          onClose={() => {
+            if (!deletingDocumentId) {
+              setDocumentPendingDeletion(null)
+            }
+          }}
+          opened={documentPendingDeletion !== null}
+          radius="xl"
+          title="确认删除文档"
+        >
+          <Stack gap="md">
+            <Text size="sm">
+              删除后将物理移除文档、全部版本和关联批注，且无法恢复。
+            </Text>
+            <PaperLikeTitle title={documentPendingDeletion?.title ?? ''} />
+            <Group justify="flex-end">
+              <Button
+                onClick={() => setDocumentPendingDeletion(null)}
+                variant="subtle"
+                disabled={deletingDocumentId !== null}
+              >
+                取消
+              </Button>
+              <Button
+                color="red"
+                loading={deletingDocumentId !== null}
+                onClick={() => void handleConfirmDeleteDocument()}
+              >
+                确认删除
+              </Button>
+            </Group>
+          </Stack>
+        </Modal>
       </div>
     </MantineProvider>
   )
@@ -507,4 +576,20 @@ function chooseDocumentId(items: DocumentListItem[], currentDocumentId: string |
 
 function toMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown error'
+}
+
+function PaperLikeTitle({ title }: { title: string }) {
+  return (
+    <Box
+      style={{
+        border: '1px solid var(--mantine-color-default-border)',
+        borderRadius: 'var(--mantine-radius-md)',
+        padding: '12px 14px',
+      }}
+    >
+      <Text fw={600} size="sm">
+        {title}
+      </Text>
+    </Box>
+  )
 }

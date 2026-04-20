@@ -261,6 +261,28 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
     },
   )
 
+  app.delete(
+    '/api/documents/:id',
+    {
+      schema: {
+        tags: ['documents'],
+        description: '物理删除文档及其所有版本和批注',
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const { id } = request.params as { id: string }
+      store.deleteDocument(id)
+      reply.status(204).send()
+    },
+  )
+
   app.get(
     '/api/documents/:id/versions',
     {

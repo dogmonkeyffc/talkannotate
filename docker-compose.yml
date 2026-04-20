@@ -11,6 +11,7 @@ services:
       PORT: 3000
       TALKANNOTATE_DATA_DIR: /app/data
       NODE_ENV: production
+      TZ: Asia/Shanghai
     volumes:
       - talkannotate-app-data:/app/data
     restart: unless-stopped

@@ -21,6 +21,15 @@ async function request<T>(input: string, init?: RequestInit) {
   return (await response.json()) as T
 }
 
+async function requestVoid(input: string, init?: RequestInit) {
+  const response = await fetch(input, init)
+
+  if (!response.ok) {
+    const payload = (await response.json().catch(() => null)) as { message?: string } | null
+    throw new Error(payload?.message ?? `Request failed with status ${response.status}`)
+  }
+}
+
 export const api = {
   async createAnnotation(documentId: string, payload: CreateAnnotationPayload) {
     return request(`/api/documents/${documentId}/annotations`, {
@@ -29,7 +38,10 @@ export const api = {
     })
   },
   async deleteAnnotation(annotationId: string) {
-    await fetch(`/api/annotations/${annotationId}`, { method: 'DELETE' })
+    await requestVoid(`/api/annotations/${annotationId}`, { method: 'DELETE' })
+  },
+  async deleteDocument(documentId: string) {
+    await requestVoid(`/api/documents/${documentId}`, { method: 'DELETE' })
   },
   async getDocumentDetail(documentId: string, version?: number) {
     const url = new URL(`/api/documents/${documentId}/content`, window.location.origin)
