@@ -410,10 +410,10 @@ export class DocumentStore {
       this.db.prepare('DELETE FROM annotations WHERE document_id = ?').run(document.id)
       this.db.prepare('DELETE FROM document_versions WHERE document_id = ?').run(document.id)
       this.db.prepare('DELETE FROM documents WHERE id = ?').run(document.id)
-    })()
 
-    rmSync(currentFilePath, { force: true })
-    rmSync(versionDirectory, { force: true, recursive: true })
+      rmSync(currentFilePath, { force: true })
+      rmSync(versionDirectory, { force: true, recursive: true })
+    })()
   }
 
   private ensureDirectories() {
