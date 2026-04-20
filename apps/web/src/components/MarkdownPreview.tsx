@@ -335,10 +335,13 @@ function buildSelectionDraft(
   const fullText = anchorRoot.textContent ?? ''
 
   const rangeRect = range.getBoundingClientRect()
-  const rootRect = rootElement.getBoundingClientRect()
 
   const contextBefore = fullText.slice(Math.max(0, startOffset - 48), startOffset)
   const contextAfter = fullText.slice(endOffset, endOffset + 48)
+
+  const popoverPadding = 12
+  const popoverMaxWidth = 400
+  const popoverVerticalOffset = 8
 
   const startPos = findInMarkdown(markdownSource, selectedText, contextBefore)
   const endPos = startPos
@@ -361,8 +364,17 @@ function buildSelectionDraft(
     endOffset,
     quote: selectedText,
     rect: {
-      left: rangeRect.left - rootRect.left,
-      top: rangeRect.bottom - rootRect.top + 8,
+      left: Math.max(
+        popoverPadding,
+        Math.min(rangeRect.left, window.innerWidth - popoverMaxWidth - popoverPadding),
+      ),
+      top: Math.max(
+        popoverPadding,
+        Math.min(
+          rangeRect.bottom + popoverVerticalOffset,
+          window.innerHeight - popoverVerticalOffset * 6,
+        ),
+      ),
     },
     selectedText,
     startCol: startPos?.col ?? null,
