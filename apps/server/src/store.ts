@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import Database from 'better-sqlite3'
 
@@ -14,6 +14,7 @@ import type {
 } from './types.js'
 
 type DocumentRow = {
+  current_file_path?: string
   current_version: number
   id: string
   slug: string
@@ -398,6 +399,23 @@ export class DocumentStore {
     }
   }
 
+  deleteDocument(documentId: string) {
+    const document = this.getDocumentRow(documentId)
+    const currentFilePath = document.current_file_path
+      ? path.join(this.dataDir, document.current_file_path)
+      : path.join(this.currentMarkdownDir, `${document.id}.md`)
+    const versionDirectory = path.join(this.versionsDir, document.id)
+
+    this.db.transaction(() => {
+      this.db.prepare('DELETE FROM annotations WHERE document_id = ?').run(document.id)
+      this.db.prepare('DELETE FROM document_versions WHERE document_id = ?').run(document.id)
+      this.db.prepare('DELETE FROM documents WHERE id = ?').run(document.id)
+    })()
+
+    rmSync(currentFilePath, { force: true })
+    rmSync(versionDirectory, { force: true, recursive: true })
+  }
+
   private ensureDirectories() {
     for (const directory of [
       this.dataDir,
@@ -485,6 +503,7 @@ export class DocumentStore {
           id,
           slug,
           title,
+          current_file_path,
           current_version,
           updated_at
         FROM documents
