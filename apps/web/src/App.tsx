@@ -264,7 +264,6 @@ function App() {
         setSelectedDocumentId(null)
         setSelectedVersion(null)
       }
-      setDocumentDeletionError(null)
       setDocumentPendingDeletion(null)
       refreshDocuments()
     } catch (error) {
