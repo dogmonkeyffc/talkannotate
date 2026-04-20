@@ -258,6 +258,12 @@ function App() {
     setDeletingDocumentId(documentPendingDeletion.id)
     try {
       await api.deleteDocument(documentPendingDeletion.id)
+      if (selectedDocumentIdRef.current === documentPendingDeletion.id) {
+        setDetailState({ status: 'idle' })
+        setFocusedBlockId(null)
+        setSelectedDocumentId(null)
+        setSelectedVersion(null)
+      }
       setDocumentDeletionError(null)
       setDocumentPendingDeletion(null)
       refreshDocuments()
@@ -545,7 +551,7 @@ function App() {
             <Text size="sm">
               删除后将物理移除文档、全部版本和关联批注，且无法恢复。
             </Text>
-            <PaperLikeTitle title={documentPendingDeletion?.title ?? ''} />
+            <DocumentTitleDisplay title={documentPendingDeletion?.title ?? ''} />
             {documentDeletionError ? (
               <Text c="red" size="sm">
                 {documentDeletionError}
@@ -595,7 +601,7 @@ function toMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown error'
 }
 
-function PaperLikeTitle({ title }: { title: string }) {
+function DocumentTitleDisplay({ title }: { title: string }) {
   return (
     <Box
       style={{
