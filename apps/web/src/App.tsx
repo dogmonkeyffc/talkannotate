@@ -62,13 +62,22 @@ function parseLocationPath(): { docId: string | null; version: number | null } {
   const segments = window.location.pathname.split('/').filter(Boolean)
   const docId = segments[0] || null
   const version = segments[1] ? Number(segments[1]) : null
-  return { docId, version: version && Number.isFinite(version) ? version : null }
+  return {
+    docId,
+    version: version && Number.isFinite(version) && Number.isInteger(version) && version > 0
+      ? version
+      : null,
+  }
 }
 
 function buildPath(docId: string | null, version: number | null): string {
   if (!docId) return '/'
   if (version !== null) return `/${docId}/${version}`
   return `/${docId}`
+}
+
+function normalizePath(p: string): string {
+  return p.replace(/\/+$/, '') || '/'
 }
 
 const initialRoute = parseLocationPath()
@@ -115,7 +124,7 @@ function App() {
       return
     }
     const target = buildPath(selectedDocumentId, selectedVersion)
-    if (window.location.pathname !== target) {
+    if (normalizePath(window.location.pathname) !== normalizePath(target)) {
       window.history.pushState(null, '', target)
     }
   }, [selectedDocumentId, selectedVersion])
