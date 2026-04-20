@@ -340,6 +340,7 @@ function buildSelectionDraft(
   const contextAfter = fullText.slice(endOffset, endOffset + 48)
 
   const popoverPadding = 12
+  const popoverBottomMargin = 48
   const popoverMaxWidth = 400
   const popoverVerticalOffset = 8
 
@@ -370,10 +371,7 @@ function buildSelectionDraft(
       ),
       top: Math.max(
         popoverPadding,
-        Math.min(
-          rangeRect.bottom + popoverVerticalOffset,
-          window.innerHeight - popoverVerticalOffset * 6,
-        ),
+        Math.min(rangeRect.bottom + popoverVerticalOffset, window.innerHeight - popoverBottomMargin),
       ),
     },
     selectedText,
