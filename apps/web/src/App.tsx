@@ -58,6 +58,21 @@ const theme = createTheme({
   primaryColor: 'green',
 })
 
+function parseLocationPath(): { docId: string | null; version: number | null } {
+  const segments = window.location.pathname.split('/').filter(Boolean)
+  const docId = segments[0] || null
+  const version = segments[1] ? Number(segments[1]) : null
+  return { docId, version: version && Number.isFinite(version) ? version : null }
+}
+
+function buildPath(docId: string | null, version: number | null): string {
+  if (!docId) return '/'
+  if (version !== null) return `/${docId}/${version}`
+  return `/${docId}`
+}
+
+const initialRoute = parseLocationPath()
+
 function App() {
   const [documentsState, setDocumentsState] = useState<RemoteState<DocumentListItem[]>>({
     status: 'loading',
@@ -65,8 +80,12 @@ function App() {
   const [detailState, setDetailState] = useState<RemoteState<DocumentDetail>>({
     status: 'idle',
   })
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null)
-  const [selectedVersion, setSelectedVersion] = useState<number | null>(null)
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
+    initialRoute.docId,
+  )
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(
+    initialRoute.version,
+  )
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const [savingAnnotation, setSavingAnnotation] = useState(false)
@@ -82,11 +101,42 @@ function App() {
     }
     return 'light'
   })
-  const selectedDocumentIdRef = useRef<string | null>(null)
+  const selectedDocumentIdRef = useRef<string | null>(initialRoute.docId)
+  const suppressPushRef = useRef(false)
 
   useEffect(() => {
     selectedDocumentIdRef.current = selectedDocumentId
   }, [selectedDocumentId])
+
+  // Sync URL when selection changes
+  useEffect(() => {
+    if (suppressPushRef.current) {
+      suppressPushRef.current = false
+      return
+    }
+    const target = buildPath(selectedDocumentId, selectedVersion)
+    if (window.location.pathname !== target) {
+      window.history.pushState(null, '', target)
+    }
+  }, [selectedDocumentId, selectedVersion])
+
+  // Handle browser back/forward
+  useEffect(() => {
+    const onPopState = () => {
+      const { docId, version } = parseLocationPath()
+      suppressPushRef.current = true
+      setSelectedDocumentId(docId)
+      setSelectedVersion(version)
+      setFocusedBlockId(null)
+      if (docId) {
+        setDetailState({ status: 'loading' })
+      } else {
+        setDetailState({ status: 'idle' })
+      }
+    }
+    window.addEventListener('popstate', onPopState)
+    return () => window.removeEventListener('popstate', onPopState)
+  }, [])
 
   const fetchDocuments = useCallback(async () => {
     try {
