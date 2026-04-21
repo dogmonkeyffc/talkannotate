@@ -580,12 +580,12 @@ function resolveDocumentTitle(markdown: string, explicitTitle?: string) {
   }
 
   const lines = markdown.split('\n').map((line) => line.trim())
-  const heading = lines.find((line) => /^#\s+/.test(line))
+  const heading = lines.find((line) => /^#(?!#)\s*/.test(line))
   if (heading) {
-    return truncateTitle(heading.replace(/^#\s+/, ''))
+    return truncateTitle(heading.replace(/^#(?!#)\s*/, ''))
   }
 
-  const firstLine = lines.find((line) => line.length > 0 && !line.startsWith('```'))
+  const firstLine = lines.find((line) => isTitleCandidate(line))
   if (firstLine) {
     const titleCandidate = firstLine.startsWith('#')
       ? firstLine.replace(/^#{1,6}\s+/, '')
@@ -603,6 +603,17 @@ function truncateTitle(value: string) {
   }
 
   return `${normalizedValue.slice(0, TITLE_FALLBACK_LENGTH).trimEnd()}…`
+}
+
+function isTitleCandidate(line: string) {
+  return (
+    line.length > 0 &&
+    !line.startsWith('```') &&
+    !line.startsWith('<!--') &&
+    !line.startsWith('>') &&
+    !/^-{3,}$/.test(line) &&
+    !/^[-*+]\s+/.test(line)
+  )
 }
 
 function extractOutline(markdown: string): OutlineItem[] {
