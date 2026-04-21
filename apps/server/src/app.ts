@@ -497,5 +497,8 @@ function parseDocumentPayload(body: unknown, id?: string) {
   }
 
   const payload = pushDocumentSchema.parse(body)
+  if (id && payload.id && payload.id !== id) {
+    throw new Error('Document ID in path and payload must match.')
+  }
   return id ? { ...payload, id } : payload
 }

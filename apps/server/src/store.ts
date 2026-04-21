@@ -580,7 +580,7 @@ function resolveDocumentTitle(markdown: string, explicitTitle?: string) {
   }
 
   const lines = markdown.split('\n').map((line) => line.trim())
-  const heading = lines.find((line) => line.startsWith('#') && !line.startsWith('##'))
+  const heading = lines.find((line) => isLevelOneHeading(line))
   if (heading) {
     return truncateTitle(stripHeadingPrefix(heading))
   }
@@ -616,6 +616,10 @@ function isTitleCandidate(line: string) {
 
 function stripHeadingPrefix(line: string) {
   return line.replace(/^#{1,6}\s*/, '')
+}
+
+function isLevelOneHeading(line: string) {
+  return /^#[^#]/.test(line)
 }
 
 function extractOutline(markdown: string): OutlineItem[] {
