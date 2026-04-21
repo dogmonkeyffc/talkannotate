@@ -50,6 +50,7 @@ type AnnotationRow = {
 }
 
 const VERSION_PAD = 4
+const DEFAULT_DOCUMENT_TITLE = 'Markdown document'
 const TITLE_FALLBACK_LENGTH = 80
 
 const sampleDocument = `# TalkAnnotate
@@ -586,16 +587,19 @@ function resolveDocumentTitle(markdown: string, explicitTitle?: string) {
 
   const firstLine = lines.find((line) => line.length > 0 && !line.startsWith('```'))
   if (firstLine) {
-    return truncateTitle(firstLine.replace(/^#{1,6}\s+/, ''))
+    const titleCandidate = firstLine.startsWith('#')
+      ? firstLine.replace(/^#{1,6}\s+/, '')
+      : firstLine
+    return truncateTitle(titleCandidate)
   }
 
-  return 'Markdown document'
+  return DEFAULT_DOCUMENT_TITLE
 }
 
 function truncateTitle(value: string) {
   const normalizedValue = value.trim()
   if (normalizedValue.length <= TITLE_FALLBACK_LENGTH) {
-    return normalizedValue || 'Markdown document'
+    return normalizedValue || DEFAULT_DOCUMENT_TITLE
   }
 
   return `${normalizedValue.slice(0, TITLE_FALLBACK_LENGTH).trimEnd()}…`
