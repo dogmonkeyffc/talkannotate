@@ -50,6 +50,7 @@ type AnnotationRow = {
 }
 
 const VERSION_PAD = 4
+const TITLE_FALLBACK_LENGTH = 80
 
 const sampleDocument = `# TalkAnnotate
 
@@ -235,8 +236,8 @@ export class DocumentStore {
   }
 
   upsertDocument(input: PushDocumentInput): DocumentDetail {
-    const title = input.title.trim()
     const content = input.content.replace(/\r\n/g, '\n')
+    const title = resolveDocumentTitle(content, input.title)
     const contentHash = hashContent(content)
     const summary = extractSummary(content)
     const existingDocument = input.id ? this.findDocumentRow(input.id) : undefined
@@ -569,6 +570,35 @@ function extractSummary(markdown: string) {
 
   const paragraph = lines.find((line) => line.length > 0 && !line.startsWith('```'))
   return (paragraph ?? 'Markdown document').slice(0, 160)
+}
+
+function resolveDocumentTitle(markdown: string, explicitTitle?: string) {
+  const normalizedTitle = explicitTitle?.trim()
+  if (normalizedTitle) {
+    return normalizedTitle
+  }
+
+  const lines = markdown.split('\n').map((line) => line.trim())
+  const heading = lines.find((line) => /^#\s+/.test(line))
+  if (heading) {
+    return truncateTitle(heading.replace(/^#\s+/, ''))
+  }
+
+  const firstLine = lines.find((line) => line.length > 0 && !line.startsWith('```'))
+  if (firstLine) {
+    return truncateTitle(firstLine.replace(/^#{1,6}\s+/, ''))
+  }
+
+  return 'Markdown document'
+}
+
+function truncateTitle(value: string) {
+  const normalizedValue = value.trim()
+  if (normalizedValue.length <= TITLE_FALLBACK_LENGTH) {
+    return normalizedValue || 'Markdown document'
+  }
+
+  return `${normalizedValue.slice(0, TITLE_FALLBACK_LENGTH).trimEnd()}…`
 }
 
 function extractOutline(markdown: string): OutlineItem[] {

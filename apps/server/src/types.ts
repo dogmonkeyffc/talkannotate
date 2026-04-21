@@ -60,7 +60,7 @@ export type DocumentDetail = {
 export const pushDocumentSchema = z.object({
   content: z.string().min(1),
   id: z.string().uuid().optional(),
-  title: z.string().trim().min(1),
+  title: z.string().trim().min(1).optional(),
 })
 
 export const createAnnotationSchema = z.object({

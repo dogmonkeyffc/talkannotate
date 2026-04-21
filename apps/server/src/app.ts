@@ -21,6 +21,7 @@ const publicDir = path.resolve(sourceDir, '../public')
 const assetsDir = path.join(publicDir, 'assets')
 const swaggerUiDir = path.dirname(require.resolve('@fastify/swagger-ui'))
 const swaggerUiStaticDir = path.join(swaggerUiDir, 'static')
+const rawDocumentContentTypes = ['application/octet-stream', 'text/markdown', 'text/plain'] as const
 
 export async function createApp() {
   const app = Fastify({
@@ -103,13 +104,11 @@ export async function createApp() {
   app.get('/favicon.svg', async (_request, reply) => reply.sendFile('favicon.svg', publicDir))
   app.get('/icons.svg', async (_request, reply) => reply.sendFile('icons.svg', publicDir))
 
-  app.addContentTypeParser(
-    'application/octet-stream',
-    { parseAs: 'buffer' },
-    (_request, body, done) => {
+  for (const contentType of rawDocumentContentTypes) {
+    app.addContentTypeParser(contentType, { parseAs: 'buffer' }, (_request, body, done) => {
       done(null, body)
-    },
-  )
+    })
+  }
 
   registerApiRoutes(app, store, dataDir)
 
@@ -200,14 +199,45 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
     {
       schema: {
         tags: ['documents'],
-        description: '创建文档或基于已有文档 ID 追加新版本',
-        body: {
+        description:
+          '创建文档。推荐直接上传 Markdown 文件流；标题会优先取第一个一级标题，否则取首行定长截断。也兼容原有 JSON 结构。',
+        consumes: ['application/json', ...rawDocumentContentTypes],
+        response: {
+          201: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              slug: { type: 'string' },
+              title: { type: 'string' },
+              summary: { type: 'string' },
+              content: { type: 'string' },
+              currentVersion: { type: 'number' },
+              updatedAt: { type: 'string' },
+            },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      const payload = parseDocumentPayload(request.body)
+      const detail = store.upsertDocument(payload)
+      reply.status(201).send(detail)
+    },
+  )
+
+  app.post(
+    '/api/documents/:id',
+    {
+      schema: {
+        tags: ['documents'],
+        description:
+          '为已有文档追加新版本。推荐直接上传 Markdown 文件流；标题会优先取第一个一级标题，否则取首行定长截断。',
+        consumes: ['application/json', ...rawDocumentContentTypes],
+        params: {
           type: 'object',
-          required: ['title', 'content'],
+          required: ['id'],
           properties: {
-            title: { type: 'string', description: '文档标题' },
-            content: { type: 'string', description: 'Markdown 内容' },
-            id: { type: 'string', format: 'uuid', description: '文档 ID（可选，用于追加版本）' },
+            id: { type: 'string', format: 'uuid' },
           },
         },
         response: {
@@ -227,7 +257,8 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
       },
     },
     async (request, reply) => {
-      const payload = pushDocumentSchema.parse(request.body)
+      const { id } = request.params as { id: string }
+      const payload = parseDocumentPayload(request.body, id)
       const detail = store.upsertDocument(payload)
       reply.status(201).send(detail)
     },
@@ -455,4 +486,16 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : 'Unknown error'
+}
+
+function parseDocumentPayload(body: unknown, id?: string) {
+  if (Buffer.isBuffer(body)) {
+    return pushDocumentSchema.parse({
+      content: body.toString('utf8'),
+      id,
+    })
+  }
+
+  const payload = pushDocumentSchema.parse(body)
+  return id ? { ...payload, id } : payload
 }
