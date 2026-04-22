@@ -11,7 +11,7 @@ const timestampFormatter = new Intl.DateTimeFormat('en', {
   year: 'numeric',
 })
 
-const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+const dateFormatter = new Intl.DateTimeFormat('en', {
   day: '2-digit',
   month: '2-digit',
   timeZone: API_TIME_ZONE,
@@ -31,8 +31,15 @@ export function formatUtcTimestampForApi(value: string) {
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}${getOffsetSuffix(date)}`
 }
 
-export function formatCurrentDateForApi(now = new Date()) {
-  return dateFormatter.format(now)
+export function formatCurrentDateForApi(date = new Date()) {
+  const parts = Object.fromEntries(
+    dateFormatter
+      .formatToParts(date)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  )
+
+  return `${parts.year}-${parts.month}-${parts.day}`
 }
 
 function parseUtcTimestamp(value: string) {
