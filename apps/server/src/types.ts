@@ -18,6 +18,7 @@ export type DocumentListItem = {
 }
 
 export type DocumentVersionSummary = {
+  changeLog: string
   createdAt: string
   summary: string
   title: string
@@ -45,6 +46,7 @@ export type AnnotationRecord = {
 
 export type DocumentDetail = {
   annotations: AnnotationRecord[]
+  changeLog: string
   content: string
   currentVersion: number
   id: string
@@ -61,6 +63,10 @@ export const pushDocumentSchema = z.object({
   content: z.string().min(1),
   id: z.string().uuid().optional(),
   title: z.string().trim().min(1),
+})
+
+export const changeLogUpdateSchema = z.object({
+  changeLog: z.string().transform((value) => value.trim()),
 })
 
 export const createAnnotationSchema = z.object({
@@ -84,3 +90,4 @@ export const createAnnotationSchema = z.object({
 
 export type PushDocumentInput = z.infer<typeof pushDocumentSchema>
 export type CreateAnnotationInput = z.infer<typeof createAnnotationSchema>
+export type ChangeLogUpdateInput = z.infer<typeof changeLogUpdateSchema>

@@ -24,6 +24,7 @@ type DocumentRow = {
 }
 
 type VersionRow = {
+  change_log: string
   created_at: string
   file_path: string
   summary: string
@@ -168,6 +169,7 @@ export class DocumentStore {
 
     return {
       annotations: this.listAnnotations(documentId, selectedVersion),
+      changeLog: versionRow.change_log,
       content,
       currentVersion: document.current_version,
       id: document.id,
@@ -187,6 +189,7 @@ export class DocumentStore {
       .prepare<
         string,
         {
+          changeLog: string
           createdAt: string
           summary: string
           title: string
@@ -194,19 +197,17 @@ export class DocumentStore {
         }
       >(
         `SELECT
-          version,
-          title,
-          summary,
-          created_at AS createdAt
-        FROM document_versions
-        WHERE document_id = ?
-        ORDER BY version DESC`,
+           version,
+           title,
+           summary,
+           change_log AS changeLog,
+           created_at AS createdAt
+         FROM document_versions
+         WHERE document_id = ?
+         ORDER BY version DESC`,
       )
       .all(document.id)
-      .map((row) => ({
-        ...row,
-        createdAt: formatUtcTimestampForApi(row.createdAt),
-      }))
+      .map((row) => mapVersionSummary(row))
   }
 
   listAnnotations(documentId: string, version?: number): AnnotationRecord[] {
@@ -319,6 +320,26 @@ export class DocumentStore {
     })()
 
     return this.getDocumentDetail(documentId, nextVersion)
+  }
+
+  updateVersionChangeLog(documentId: string, version: number, changeLog: string): DocumentVersionSummary {
+    const document = this.getDocumentRow(documentId)
+    this.getVersionRow(document.id, version)
+
+    const result = this.db
+      .prepare(
+        `UPDATE document_versions
+         SET change_log = ?
+         WHERE document_id = ?
+           AND version = ?`,
+      )
+      .run(changeLog, document.id, version)
+
+    if (result.changes === 0) {
+      throw new Error(`Version ${version} was not found.`)
+    }
+
+    return this.getVersionSummary(document.id, version)
   }
 
   createAnnotation(documentId: string, input: CreateAnnotationInput): AnnotationRecord {
@@ -456,6 +477,7 @@ export class DocumentStore {
         title TEXT NOT NULL,
         content_hash TEXT NOT NULL,
         summary TEXT NOT NULL,
+        change_log TEXT NOT NULL DEFAULT '',
         file_path TEXT NOT NULL,
         created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE,
@@ -493,6 +515,7 @@ export class DocumentStore {
     addColumn('ALTER TABLE annotations ADD COLUMN start_col INTEGER')
     addColumn('ALTER TABLE annotations ADD COLUMN end_line INTEGER')
     addColumn('ALTER TABLE annotations ADD COLUMN end_col INTEGER')
+    addColumn("ALTER TABLE document_versions ADD COLUMN change_log TEXT NOT NULL DEFAULT ''")
   }
 
   private getDocumentRow(documentId: string): DocumentRow {
@@ -524,12 +547,13 @@ export class DocumentStore {
     const row = this.db
       .prepare<[string, number], VersionRow>(
         `SELECT
-          version,
-          title,
-          summary,
-          file_path,
-          created_at
-        FROM document_versions
+           version,
+           title,
+           summary,
+           change_log,
+           file_path,
+           created_at
+         FROM document_versions
         WHERE document_id = ?
           AND version = ?`,
       )
@@ -540,6 +564,37 @@ export class DocumentStore {
     }
 
     return row
+  }
+
+  private getVersionSummary(documentId: string, version: number): DocumentVersionSummary {
+    const row = this.db
+      .prepare<
+        [string, number],
+        {
+          changeLog: string
+          createdAt: string
+          summary: string
+          title: string
+          version: number
+        }
+      >(
+        `SELECT
+           version,
+           title,
+           summary,
+           change_log AS changeLog,
+           created_at AS createdAt
+         FROM document_versions
+         WHERE document_id = ?
+           AND version = ?`,
+      )
+      .get(documentId, version)
+
+    if (!row) {
+      throw new Error(`Version ${version} was not found.`)
+    }
+
+    return mapVersionSummary(row)
   }
 
   private getVersionMetadata(documentId: string, version: number): { hash: string } | undefined {
@@ -616,6 +671,19 @@ function normalizeSlug(value: string) {
     .replace(/^-+|-+$/g, '')
 
   return slug || `document-${Date.now()}`
+}
+
+function mapVersionSummary(row: {
+  changeLog: string
+  createdAt: string
+  summary: string
+  title: string
+  version: number
+}): DocumentVersionSummary {
+  return {
+    ...row,
+    createdAt: formatUtcTimestampForApi(row.createdAt),
+  }
 }
 
 function mapAnnotationRow(row: AnnotationRow): AnnotationRecord {

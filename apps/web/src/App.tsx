@@ -249,6 +249,7 @@ function App() {
       `Slug: ${data.slug}`,
       `Version: v${data.selectedVersion} (latest: v${data.currentVersion})`,
       `Annotations: ${data.annotations.length}`,
+      ...(data.changeLog ? ['', 'Change log:', data.changeLog] : []),
       '',
       'Please review the annotations on this document and address each one.',
     ].join('\n')
@@ -538,6 +539,23 @@ function App() {
 
                   <div className="main-grid">
                     <section className="preview-pane">
+                      {state.data.changeLog ? (
+                        <Box
+                          mb="md"
+                          p="md"
+                          style={{
+                            border: '1px solid var(--mantine-color-gray-3)',
+                            borderRadius: '12px',
+                          }}
+                        >
+                          <Text fw={700} mb={6} size="sm">
+                            更新日志
+                          </Text>
+                          <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>
+                            {state.data.changeLog}
+                          </Text>
+                        </Box>
+                      ) : null}
                       <MarkdownPreview
                         annotations={state.data.annotations}
                         busy={savingAnnotation}
