@@ -364,9 +364,9 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
       },
     },
     async (request) => {
-      const { id, version } = request.params as { id: string; version: string }
+      const { id, version } = request.params as { id: string; version: number }
       const payload = changeLogUpdateSchema.parse(request.body)
-      return store.updateVersionChangeLog(id, Number(version), payload.changeLog)
+      return store.updateVersionChangeLog(id, version, payload.changeLog)
     },
   )
 
