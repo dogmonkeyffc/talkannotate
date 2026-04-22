@@ -12,6 +12,7 @@ import type {
   OutlineItem,
   PushDocumentInput,
 } from './types.js'
+import { formatUtcTimestampForApi } from './time.js'
 
 type DocumentRow = {
   current_file_path?: string
@@ -153,7 +154,10 @@ export class DocumentStore {
       )
       .all()
 
-    return rows
+    return rows.map((row) => ({
+      ...row,
+      updatedAt: formatUtcTimestampForApi(row.updatedAt),
+    }))
   }
 
   getDocumentDetail(documentId: string, requestedVersion?: number): DocumentDetail {
@@ -172,7 +176,7 @@ export class DocumentStore {
       slug: document.slug,
       summary: versionRow.summary,
       title: document.title,
-      updatedAt: document.updated_at,
+      updatedAt: formatUtcTimestampForApi(document.updated_at),
       versions: this.listVersions(documentId),
     }
   }
@@ -199,6 +203,10 @@ export class DocumentStore {
         ORDER BY version DESC`,
       )
       .all(document.id)
+      .map((row) => ({
+        ...row,
+        createdAt: formatUtcTimestampForApi(row.createdAt),
+      }))
   }
 
   listAnnotations(documentId: string, version?: number): AnnotationRecord[] {
@@ -616,7 +624,7 @@ function mapAnnotationRow(row: AnnotationRow): AnnotationRecord {
     color: row.color,
     contextAfter: row.context_after,
     contextBefore: row.context_before,
-    createdAt: row.created_at,
+    createdAt: formatUtcTimestampForApi(row.created_at),
     endCol: row.end_col,
     endLine: row.end_line,
     endOffset: row.end_offset,
