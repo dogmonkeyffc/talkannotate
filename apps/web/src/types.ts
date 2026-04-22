@@ -16,6 +16,7 @@ export type DocumentListItem = {
 }
 
 export type DocumentVersionSummary = {
+  changeLog: string
   createdAt: string
   summary: string
   title: string
@@ -43,6 +44,7 @@ export type AnnotationRecord = {
 
 export type DocumentDetail = {
   annotations: AnnotationRecord[]
+  changeLog: string
   content: string
   currentVersion: number
   id: string

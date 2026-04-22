@@ -13,7 +13,7 @@ import { ZodError } from 'zod'
 
 import { DocumentStore } from './store.js'
 import { formatCurrentDateForApi } from './time.js'
-import { createAnnotationSchema, pushDocumentSchema } from './types.js'
+import { changeLogUpdateSchema, createAnnotationSchema, pushDocumentSchema } from './types.js'
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url))
 const require = createRequire(import.meta.url)
@@ -219,6 +219,7 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
               slug: { type: 'string' },
               title: { type: 'string' },
               summary: { type: 'string' },
+              changeLog: { type: 'string' },
               content: { type: 'string' },
               currentVersion: { type: 'number' },
               updatedAt: { type: 'string' },
@@ -297,6 +298,26 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
             id: { type: 'string', format: 'uuid' },
           },
         },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              items: {
+                type: 'array',
+                items: {
+                  type: 'object',
+                  properties: {
+                    changeLog: { type: 'string' },
+                    createdAt: { type: 'string' },
+                    summary: { type: 'string' },
+                    title: { type: 'string' },
+                    version: { type: 'number' },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
     async (request) => {
@@ -304,6 +325,48 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
       return {
         items: store.listVersions(id),
       }
+    },
+  )
+
+  app.put(
+    '/api/documents/:id/versions/:version/change-log',
+    {
+      schema: {
+        tags: ['documents'],
+        description: '为指定版本补充或更新变更日志',
+        params: {
+          type: 'object',
+          required: ['id', 'version'],
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            version: { type: 'number', minimum: 1 },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['changeLog'],
+          properties: {
+            changeLog: { type: 'string', description: '该版本的变更说明，可为空字符串以清空' },
+          },
+        },
+        response: {
+          200: {
+            type: 'object',
+            properties: {
+              changeLog: { type: 'string' },
+              createdAt: { type: 'string' },
+              summary: { type: 'string' },
+              title: { type: 'string' },
+              version: { type: 'number' },
+            },
+          },
+        },
+      },
+    },
+    async (request) => {
+      const { id, version } = request.params as { id: string; version: string }
+      const payload = changeLogUpdateSchema.parse(request.body)
+      return store.updateVersionChangeLog(id, Number(version), payload.changeLog)
     },
   )
 

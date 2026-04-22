@@ -28,3 +28,11 @@ TALKANNOTATE_HOST_PORT=8080 docker compose up -d --build
 
 查阅 api 在线文档：http://localhost:3180/documentation/json
 
+常用预览服务操作也已经包装成脚本，可直接复用：
+
+```bash
+pnpm preview:documents
+pnpm preview:publish -- --title "版本发布说明" --file /absolute/path/to/doc.md
+pnpm preview:set-changelog -- --id <document-id> --version 2 --file /absolute/path/to/change-log.md
+pnpm preview:annotations -- --id <document-id> --version 2
+```
