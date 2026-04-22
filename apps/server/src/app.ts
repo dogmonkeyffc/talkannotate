@@ -12,6 +12,7 @@ import Fastify, { type FastifyInstance } from 'fastify'
 import { ZodError } from 'zod'
 
 import { DocumentStore } from './store.js'
+import { formatCurrentDateForApi } from './time.js'
 import { createAnnotationSchema, pushDocumentSchema } from './types.js'
 
 const sourceDir = path.dirname(fileURLToPath(import.meta.url))
@@ -417,7 +418,7 @@ function registerApiRoutes(app: FastifyInstance, store: DocumentStore, dataDir: 
       },
     },
     async (_request, reply) => {
-      const date = new Date().toISOString().slice(0, 10)
+      const date = formatCurrentDateForApi()
       const filename = `talkannotate-backup-${date}.tar.gz`
       reply.header('Content-Type', 'application/gzip')
       reply.header('Content-Disposition', `attachment; filename="${filename}"`)
