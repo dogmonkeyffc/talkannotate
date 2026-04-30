@@ -98,6 +98,7 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
   flex: 1;
+  align-items: start;
 }
 
 .preview-pane {
@@ -108,9 +109,13 @@
 .annotation-pane {
   border-left: 1px solid rgba(148, 163, 184, 0.14);
   background: rgba(8, 12, 24, 0.44);
+  position: sticky;
+  top: 0;
+  align-self: start;
 }
 
 .annotation-pane__content {
+  height: calc(100vh - 56px);
   min-height: 200px;
   padding: 20px;
 }
@@ -364,8 +369,14 @@
   }
 
   .annotation-pane {
+    position: static;
+    top: auto;
     border-left: none;
     border-top: 1px solid rgba(148, 163, 184, 0.14);
+  }
+
+  .annotation-pane__content {
+    height: auto;
   }
 }
 

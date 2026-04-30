@@ -111,10 +111,20 @@ function App() {
   })
   const selectedDocumentIdRef = useRef<string | null>(initialRoute.docId)
   const suppressPushRef = useRef(false)
+  const annotationPaneRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     selectedDocumentIdRef.current = selectedDocumentId
   }, [selectedDocumentId])
+
+  // Scroll annotation panel to the focused block's card
+  useEffect(() => {
+    if (!focusedBlockId || !annotationPaneRef.current) return
+    const card = annotationPaneRef.current.querySelector<HTMLElement>(
+      `[data-block-id="${focusedBlockId}"]`,
+    )
+    card?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [focusedBlockId])
 
   // Sync URL when selection changes
   useEffect(() => {
@@ -563,33 +573,36 @@ function App() {
                         content={state.data.content}
                         focusedBlockId={focusedBlockId}
                         onCreateAnnotation={handleCreateAnnotation}
+                        onFocusBlock={setFocusedBlockId}
                         version={state.data.selectedVersion}
                       />
                     </section>
 
                     <aside className="annotation-pane">
                       <ScrollArea className="annotation-pane__content" type="auto">
-                        <Group justify="space-between" mb="md">
-                          <Text fw={700}>Annotations</Text>
-                          <Badge variant="light">{state.data.annotations.length}</Badge>
-                        </Group>
+                        <div ref={annotationPaneRef}>
+                          <Group justify="space-between" mb="md">
+                            <Text fw={700}>Annotations</Text>
+                            <Badge variant="light">{state.data.annotations.length}</Badge>
+                          </Group>
 
-                        {state.data.annotations.length > 0 ? (
-                          <Stack gap="sm">
-                            {state.data.annotations.map((annotation) => (
-                              <AnnotationCard
-                                annotation={annotation}
-                                key={annotation.id}
-                                onDelete={(id) => void handleDeleteAnnotation(id)}
-                                onFocus={setFocusedBlockId}
-                              />
-                            ))}
-                          </Stack>
-                        ) : (
-                          <Text c="dimmed" size="sm">
-                            选中文档文本即可添加批注。
-                          </Text>
-                        )}
+                          {state.data.annotations.length > 0 ? (
+                            <Stack gap="sm">
+                              {state.data.annotations.map((annotation) => (
+                                <AnnotationCard
+                                  annotation={annotation}
+                                  key={annotation.id}
+                                  onDelete={(id) => void handleDeleteAnnotation(id)}
+                                  onFocus={setFocusedBlockId}
+                                />
+                              ))}
+                            </Stack>
+                          ) : (
+                            <Text c="dimmed" size="sm">
+                              选中文档文本即可添加批注。
+                            </Text>
+                          )}
+                        </div>
                       </ScrollArea>
                     </aside>
                   </div>

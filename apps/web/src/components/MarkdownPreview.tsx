@@ -25,6 +25,7 @@ type MarkdownPreviewProps = {
   content: string
   focusedBlockId: string | null
   onCreateAnnotation: (payload: CreateAnnotationPayload) => Promise<void>
+  onFocusBlock: (blockId: string) => void
   version: number
 }
 
@@ -56,6 +57,7 @@ export function MarkdownPreview({
   content,
   focusedBlockId,
   onCreateAnnotation,
+  onFocusBlock,
   version,
 }: MarkdownPreviewProps) {
   const rootRef = useRef<HTMLDivElement | null>(null)
@@ -84,6 +86,32 @@ export function MarkdownPreview({
     })
   }, [focusedBlockId])
 
+  // Sync annotation panel as user scrolls: observe annotated blocks entering viewport
+  useEffect(() => {
+    const root = rootRef.current
+    if (!root) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top)
+        const topEntry = visible[0]
+        if (topEntry) {
+          const blockId = (topEntry.target as HTMLElement).dataset.blockId
+          if (blockId) onFocusBlock(blockId)
+        }
+      },
+      // Fire when annotated block enters the upper 40% of the viewport
+      { rootMargin: '0px 0px -60% 0px', threshold: 0 },
+    )
+
+    const annotatedBlocks = root.querySelectorAll<HTMLElement>('[data-annotation-count]')
+    annotatedBlocks.forEach((el) => observer.observe(el))
+
+    return () => observer.disconnect()
+  }, [annotationCountByBlock, onFocusBlock])
+
   const components = useMemo(
     () =>
       ({
@@ -91,6 +119,7 @@ export function MarkdownPreview({
           'blockquote',
           annotationCountByBlock,
           focusedBlockId,
+          onFocusBlock,
         ) as Components['blockquote'],
         code({ children, className }) {
           const language = className?.replace('language-', '')
@@ -102,21 +131,62 @@ export function MarkdownPreview({
 
           return <code className={className}>{children}</code>
         },
-        h1: createBlockRenderer('h1', annotationCountByBlock, focusedBlockId) as Components['h1'],
-        h2: createBlockRenderer('h2', annotationCountByBlock, focusedBlockId) as Components['h2'],
-        h3: createBlockRenderer('h3', annotationCountByBlock, focusedBlockId) as Components['h3'],
-        h4: createBlockRenderer('h4', annotationCountByBlock, focusedBlockId) as Components['h4'],
-        h5: createBlockRenderer('h5', annotationCountByBlock, focusedBlockId) as Components['h5'],
-        h6: createBlockRenderer('h6', annotationCountByBlock, focusedBlockId) as Components['h6'],
-        li: createBlockRenderer('li', annotationCountByBlock, focusedBlockId) as Components['li'],
-        p: createBlockRenderer('p', annotationCountByBlock, focusedBlockId) as Components['p'],
+        h1: createBlockRenderer(
+          'h1',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['h1'],
+        h2: createBlockRenderer(
+          'h2',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['h2'],
+        h3: createBlockRenderer(
+          'h3',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['h3'],
+        h4: createBlockRenderer(
+          'h4',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['h4'],
+        h5: createBlockRenderer(
+          'h5',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['h5'],
+        h6: createBlockRenderer(
+          'h6',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['h6'],
+        li: createBlockRenderer(
+          'li',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['li'],
+        p: createBlockRenderer(
+          'p',
+          annotationCountByBlock,
+          focusedBlockId,
+          onFocusBlock,
+        ) as Components['p'],
         pre: createBlockRenderer(
           'pre',
           annotationCountByBlock,
           focusedBlockId,
+          onFocusBlock,
         ) as Components['pre'],
       }) satisfies Components,
-    [annotationCountByBlock, focusedBlockId],
+    [annotationCountByBlock, focusedBlockId, onFocusBlock],
   )
 
   const handleMouseUp = () => {
@@ -266,6 +336,7 @@ export function AnnotationCard({
   return (
     <Paper
       className="annotation-card"
+      data-block-id={annotation.blockId}
       onClick={() => onFocus(annotation.blockId)}
       p="sm"
       radius="md"
@@ -320,16 +391,16 @@ function buildSelectionDraft(
     return null
   }
 
-  const startBlock = getBlockElement(range.startContainer)
-  const endBlock = getBlockElement(range.endContainer)
-  const singleBlockSelection = startBlock && endBlock && startBlock === endBlock
+  const selectedBlocks = getIntersectingBlocks(rootElement, range)
+  const selectedBlock = selectedBlocks.length === 1 ? selectedBlocks[0] : null
+  const singleBlockSelection = selectedBlock !== null
 
   const selectedText = selection.toString().trim()
   if (!selectedText) {
     return null
   }
 
-  const anchorRoot = singleBlockSelection ? startBlock : rootElement
+  const anchorRoot = selectedBlock ?? rootElement
   const startOffset = getTextOffset(anchorRoot, range.startContainer, range.startOffset)
   const endOffset = getTextOffset(anchorRoot, range.endContainer, range.endOffset)
   const fullText = anchorRoot.textContent ?? ''
@@ -356,7 +427,7 @@ function buildSelectionDraft(
 
   return {
     blockId: singleBlockSelection
-      ? (startBlock.dataset.blockId ?? 'unknown-block')
+      ? (selectedBlock?.dataset.blockId ?? 'unknown-block')
       : 'document-root',
     contextAfter,
     contextBefore,
@@ -371,7 +442,10 @@ function buildSelectionDraft(
       ),
       top: Math.max(
         popoverPadding,
-        Math.min(rangeRect.bottom + popoverVerticalOffset, window.innerHeight - popoverBottomMargin),
+        Math.min(
+          rangeRect.bottom + popoverVerticalOffset,
+          window.innerHeight - popoverBottomMargin,
+        ),
       ),
     },
     selectedText,
@@ -393,6 +467,7 @@ function createBlockRenderer<Tag extends MarkdownBlockTag>(
   tag: Tag,
   annotationCountByBlock: Record<string, number>,
   focusedBlockId: string | null,
+  onFocusBlock: (blockId: string) => void,
 ): (props: MarkdownComponentProps) => React.ReactElement {
   const Block = ({ children, className, node, ...props }: MarkdownComponentProps) => {
     const blockId = createBlockId(tag, node)
@@ -406,6 +481,7 @@ function createBlockRenderer<Tag extends MarkdownBlockTag>(
         'data-annotation-count': count ? String(count) : undefined,
         'data-block-id': blockId,
         'data-focused': focusedBlockId === blockId ? 'true' : undefined,
+        onClick: count ? () => onFocusBlock(blockId) : undefined,
       },
       children,
     )
@@ -414,9 +490,21 @@ function createBlockRenderer<Tag extends MarkdownBlockTag>(
   return Block
 }
 
-function getBlockElement(node: Node) {
-  const element = node instanceof HTMLElement ? node : node.parentElement
-  return element?.closest<HTMLElement>('[data-block-id]')
+function getIntersectingBlocks(rootElement: HTMLElement, range: Range): HTMLElement[] {
+  return Array.from(rootElement.querySelectorAll<HTMLElement>('[data-block-id]')).filter(
+    (block) => {
+      if (!range.intersectsNode(block)) {
+        return false
+      }
+
+      const blockText = block.textContent?.trim()
+      if (!blockText) {
+        return false
+      }
+
+      return range.toString().includes(blockText) || blockText.includes(range.toString())
+    },
+  )
 }
 
 function getTextOffset(rootElement: HTMLElement, container: Node, offset: number) {
