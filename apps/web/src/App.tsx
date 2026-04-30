@@ -64,9 +64,10 @@ function parseLocationPath(): { docId: string | null; version: number | null } {
   const version = segments[1] ? Number(segments[1]) : null
   return {
     docId,
-    version: version && Number.isFinite(version) && Number.isInteger(version) && version > 0
-      ? version
-      : null,
+    version:
+      version && Number.isFinite(version) && Number.isInteger(version) && version > 0
+        ? version
+        : null,
   }
 }
 
@@ -86,19 +87,17 @@ function App() {
   const [documentsState, setDocumentsState] = useState<RemoteState<DocumentListItem[]>>({
     status: 'loading',
   })
-  const [detailState, setDetailState] = useState<RemoteState<DocumentDetail>>({
-    status: 'idle',
-  })
-  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(
-    initialRoute.docId,
+  const [detailState, setDetailState] = useState<RemoteState<DocumentDetail>>(
+    initialRoute.docId ? { status: 'loading' } : { status: 'idle' },
   )
-  const [selectedVersion, setSelectedVersion] = useState<number | null>(
-    initialRoute.version,
-  )
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(initialRoute.docId)
+  const [selectedVersion, setSelectedVersion] = useState<number | null>(initialRoute.version)
   const [focusedBlockId, setFocusedBlockId] = useState<string | null>(null)
   const [refreshToken, setRefreshToken] = useState(0)
   const [savingAnnotation, setSavingAnnotation] = useState(false)
-  const [documentPendingDeletion, setDocumentPendingDeletion] = useState<DocumentListItem | null>(null)
+  const [documentPendingDeletion, setDocumentPendingDeletion] = useState<DocumentListItem | null>(
+    null,
+  )
   const [documentDeletionError, setDocumentDeletionError] = useState<string | null>(null)
   const [deletingDocumentId, setDeletingDocumentId] = useState<string | null>(null)
   const [colorScheme, setColorScheme] = useState<'dark' | 'light'>(() => {
@@ -152,7 +151,9 @@ function App() {
       const items = await api.listDocuments()
       const nextDocumentId = chooseDocumentId(items, selectedDocumentIdRef.current)
       setDocumentsState({ data: items, status: 'ready' })
-      setDetailState(nextDocumentId ? { status: 'loading' } : { status: 'idle' })
+      if (nextDocumentId !== selectedDocumentIdRef.current) {
+        setDetailState(nextDocumentId ? { status: 'loading' } : { status: 'idle' })
+      }
       setSelectedDocumentId(nextDocumentId)
     } catch (error) {
       setDocumentsState({
@@ -624,9 +625,7 @@ function App() {
           title="确认删除文档"
         >
           <Stack gap="md">
-            <Text size="sm">
-              删除后将物理移除文档、全部版本和关联批注，且无法恢复。
-            </Text>
+            <Text size="sm">删除后将物理移除文档、全部版本和关联批注，且无法恢复。</Text>
             <DocumentTitleDisplay title={documentPendingDeletion?.title ?? ''} />
             {documentDeletionError ? (
               <Text c="red" size="sm">
